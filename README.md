@@ -1,2 +1,3 @@
 # EVA
-Ethereum Vigilance Agent(EVA) is a small program that can communicate with ethereum peers and collect ethereum transactions in ethereum p2p network.
+The Ethereum Vigilance Agent (EVA) is a program designed to communicate with Ethereum peers and collect Ethereum transactions on the P2P network. 
+~~This project aims to make it simple for anyone to become an EVA pilot.~~
