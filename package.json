@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@ethereumjs/devp2p": "^5.1.1"
+  }
+}
