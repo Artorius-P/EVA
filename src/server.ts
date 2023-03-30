@@ -1,6 +1,5 @@
-import { Consts } from "./interfaces/consts"
+import { Consts, ServerOptions } from "./interfaces"
 import { DPT, RLPx, ETH} from '@ethereumjs/devp2p'
-import { ServerOptions } from "./interfaces/serverOptions"
 
 export class Server {
     public consts: Consts

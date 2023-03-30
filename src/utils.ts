@@ -1,6 +1,5 @@
 import { randomBytes } from "crypto";
-import { Config } from "./interfaces/config";
-import { Consts } from "./interfaces/consts";
+import { Config, Consts } from "./interfaces";
 import {existsSync, readFileSync} from "fs"
 import { Chain, Common, Hardfork } from "@ethereumjs/common";
 function get_consts(config: Config): Consts {
