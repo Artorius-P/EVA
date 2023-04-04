@@ -1,21 +1,27 @@
 import { Consts, ServerOptions } from "./interfaces"
-import { DPT, RLPx, ETH} from '@ethereumjs/devp2p'
-
+import { DPT, RLPx, ETH } from '@ethereumjs/devp2p'
+import { Logger } from "tslog"
+import { Peer } from "@ethereumjs/devp2p"
 export class Server {
     public consts: Consts
     public dpt: DPT | null = null
     public rlpx: RLPx | null = null
     public ip: string
+    public port: number
     public refreshInterval: number
     public maxPeers: number
     public clientFilter: Array<string>
+    public logger = new Logger()
+    private started = false
     private key: Buffer
+    // private peers: Map<string, Peer> = new Map()
 
     constructor(options: ServerOptions) {
         this.ip = options.ip ?? '0.0.0.0'
         this.consts = options.consts
         this.refreshInterval = options.refreshInterval ?? 30000
         this.maxPeers = options.maxPeers ?? 50
+        this.port = options.port ?? 30303
         this.key = this.consts.PRIVATE_KEY
         this.clientFilter = options.clientFilter ?? [
             'go1.5',
@@ -27,7 +33,24 @@ export class Server {
             'gmc',
             'gwhale',
             'prichain',
-          ]
+        ]
+    }
+    async start(): Promise<boolean> {
+        if (this.started){
+            return false
+        }
+        await this.initDpt()
+        await this.initRlpx()
+        this.started = true
+        return true
+    }
+    async stop(): Promise<boolean> {
+        if (this.started) {
+            this.rlpx!.destroy()
+            this.dpt!.destroy()
+            this.started = false
+        }
+        return this.started
     }
     private async initDpt() {
         return new Promise<void>((resolve) => {
@@ -40,7 +63,9 @@ export class Server {
                 },
             })
 
-            this.dpt.on('error', (e: Error) => { })
+            this.dpt.on('error', (error: Error) => {
+                this.logger.error(`DPT Error: ${error}`)
+            })
             this.dpt.on('listening', () => {
                 resolve()
             })
@@ -59,40 +84,35 @@ export class Server {
                 common: this.consts.COMMON,
             })
 
-            this.rlpx.on('peer:added', (peer) => {
-            })
-
-            this.rlpx.on('peer:removed', (rlpxPeer: Devp2pRLPxPeer, reason: any) => {
-                const id = (rlpxPeer.getId() as Buffer).toString('hex')
-                const peer = this.peers.get(id)
-                if (peer) {
-                    this.peers.delete(peer.id)
-                    this.config.logger.debug(
-                        `Peer disconnected (${rlpxPeer.getDisconnectPrefix(reason)}): ${peer}`
-                    )
-                    this.config.events.emit(Event.PEER_DISCONNECTED, peer)
+            this.rlpx.on('peer:added', (peer: Peer) => {
+                try {
+                    const id = (peer.getId() as Buffer).toString('hex')
+                    this.logger.info(`Peer connedted: ${id}`)
+                } catch (error: any) {
+                    this.logger.error(error)
                 }
             })
 
-            this.rlpx.on('peer:error', (rlpxPeer: Devp2pRLPxPeer, error: Error) => {
-                const peerId = rlpxPeer.getId()
-                if (peerId === null) {
-                    return this.error(error)
-                }
-                this.error(error)
+            this.rlpx.on('peer:removed', (peer: Peer, reason: any) => {
+                const id = (peer.getId() as Buffer).toString('hex')
+                this.logger.info(`Peer disconnected: ${id}, Reason: ${reason}`)
+
             })
 
-            this.rlpx.on('error', (e: Error) => this.error(e))
+            this.rlpx.on('peer:error', (peer: Peer, error: Error) => {
+                const id = (peer.getId() as Buffer).toString('hex')
+                this.logger.info(`Peer error: ${id}, Error: ${error}`)
+            })
+
+            this.rlpx.on('error', (error: Error) => {
+                this.logger.error(`RLPx Error: ${error}`)
+            })
 
             this.rlpx.on('listening', () => {
-                this.config.events.emit(Event.SERVER_LISTENING, {
-                    transport: this.name,
-                    url: this.getRlpxInfo().enode ?? '',
-                })
                 resolve()
             })
 
-            this.rlpx.listen(this.config.port, '0.0.0.0')
+            this.rlpx.listen(this.port, this.ip)
         })
     }
 }
