@@ -1,8 +1,8 @@
 import { randomBytes } from "crypto";
-import { Config, Consts } from "./interfaces";
+import { Config, Consts, ServerOptions } from "./interfaces";
 import {existsSync, readFileSync} from "fs"
 import { Chain, Common, Hardfork } from "@ethereumjs/common";
-function get_consts(config: Config): Consts {
+function getConsts(config: Config): Consts {
     let consts: Consts = {
         CHECK_BLOCK_TITLE: "London Fork",
         CHECK_BLOCK_NR: 12965000,
@@ -22,7 +22,7 @@ function get_consts(config: Config): Consts {
     return consts
 }
 
-function get_config(path: string): Config {
+function getConfig(path: string): Config {
     let config: Config = {
         Network: "Mainnet",
         Fork: "London",
@@ -31,5 +31,15 @@ function get_config(path: string): Config {
         config = JSON.parse(readFileSync(path, "utf8"))
     }
     return config
+}
 
+export function getOptions(path: string): ServerOptions {
+    const config = getConfig(path)
+    const consts = getConsts(config)
+    const options: ServerOptions = {
+        consts: consts,
+        ip: config.IP,
+        port: config.ListenPort
+    }
+    return options
 }

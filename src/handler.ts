@@ -2,47 +2,31 @@ import { Server } from "./server";
 import { RLPx, DPT, Peer } from "@ethereumjs/devp2p";
 import LRUCache from "lru-cache";
 import { Logger } from "tslog";
+import { ETH } from "./eth";
 
 const getPeerAddr = (peer: Peer) =>
-  `${peer._socket.remoteAddress}:${peer._socket.remotePort}`;
+  `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
 
 export class Handler {
     public logger = new Logger
-    private txCache = new LRUCache({max: 1000})
-    private blockCache = new LRUCache({max: 100})
-
-    // Nodes should send status first
-    status(status: any) {
-        this.logger.debug(`besthash: ${status.bestHash.toString('hex')} forkid: ${status.forkId.toString('hex')}`)
-
-    }
-    newTxHash() {
-
+    public eth: ETH
+    public rlpx: RLPx
+    constructor(eth: ETH, rlpx: RLPx) {
+      this.eth = eth
+      this.rlpx = rlpx
     }
 
-    newTx() {
-
+    async handle(peer: Peer) {
+      await this.handshake(peer)
     }
 
-    newBlockHash() {
-
+    async handshake(peer: Peer) {
+      const addr = getPeerAddr(peer)
+      let j = 0
+      const prot = peer.getProtocols()
+      const eth = peer.getProtocols()[0]
+      // TODO: sendstatus
     }
-
-    getBlockHeaders() {
-
-    }
-
-    blockHeaders() {
-
-    }
-
-    getBlockBodies(){
-
-    }
-
-    newBlock() {
-
-    }
-
+    
 }
 

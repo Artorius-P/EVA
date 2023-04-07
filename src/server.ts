@@ -2,6 +2,7 @@ import { Consts, ServerOptions } from "./interfaces"
 import { DPT, RLPx, ETH } from '@ethereumjs/devp2p'
 import { Logger } from "tslog"
 import { Peer } from "@ethereumjs/devp2p"
+import { Handler } from "./handler"
 export class Server {
     public consts: Consts
     public dpt: DPT | null = null
@@ -12,11 +13,11 @@ export class Server {
     public maxPeers: number
     public clientFilter: Array<string>
     public logger = new Logger()
-    private started = false
+    public handler: Handler
     private key: Buffer
     // private peers: Map<string, Peer> = new Map()
 
-    constructor(options: ServerOptions) {
+    constructor(options: ServerOptions, handler: Handler) {
         this.ip = options.ip ?? '0.0.0.0'
         this.consts = options.consts
         this.refreshInterval = options.refreshInterval ?? 30000
@@ -34,24 +35,13 @@ export class Server {
             'gwhale',
             'prichain',
         ]
+        this.handler = handler
     }
-    async start(): Promise<boolean> {
-        if (this.started){
-            return false
-        }
+    async start(): Promise<void> {
         await this.initDpt()
         await this.initRlpx()
-        this.started = true
-        return true
     }
-    async stop(): Promise<boolean> {
-        if (this.started) {
-            this.rlpx!.destroy()
-            this.dpt!.destroy()
-            this.started = false
-        }
-        return this.started
-    }
+
     private async initDpt() {
         return new Promise<void>((resolve) => {
             this.dpt = new DPT(this.key, {
@@ -73,7 +63,7 @@ export class Server {
     }
 
     private async initRlpx() {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>(() => {
             this.rlpx = new RLPx(this.key, {
                 // clientId: Buffer.from(getClientVersion()),
                 dpt: this.dpt!,
@@ -88,6 +78,7 @@ export class Server {
                 try {
                     const id = (peer.getId() as Buffer).toString('hex')
                     this.logger.info(`Peer connedted: ${id}`)
+                    this.handler.handle(peer)
                 } catch (error: any) {
                     this.logger.error(error)
                 }
@@ -106,10 +97,6 @@ export class Server {
 
             this.rlpx.on('error', (error: Error) => {
                 this.logger.error(`RLPx Error: ${error}`)
-            })
-
-            this.rlpx.on('listening', () => {
-                resolve()
             })
 
             this.rlpx.listen(this.port, this.ip)

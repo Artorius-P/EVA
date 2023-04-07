@@ -2,5 +2,6 @@ export interface Config {
     Network: string,
     Fork: string,
     Key?: string,
-    ListenPort?: number
+    ListenPort?: number,
+    IP?: string
 }
