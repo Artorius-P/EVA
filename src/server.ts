@@ -12,7 +12,9 @@ export class Server {
     public refreshInterval: number
     public maxPeers: number
     public clientFilter: Array<string>
-    public logger = new Logger()
+    public logger = new Logger({
+        minLevel: 5
+    })
     public handler: Handler
     private key: Buffer
     // private peers: Map<string, Peer> = new Map()
@@ -36,13 +38,23 @@ export class Server {
             'prichain',
         ]
         this.handler = handler
+        this.handler.setConsts(this.consts)
     }
+
     async start(): Promise<void> {
         await this.initDpt()
         await this.initRlpx()
     }
 
     private async initDpt() {
+        const bootstrapNodes = this.consts.COMMON.bootstrapNodes();
+        const BOOTNODES = bootstrapNodes.map((node: any) => {
+            return {
+                address: node.ip,
+                udpPort: node.port,
+                tcpPort: node.port,
+            };
+        });
         return new Promise<void>((resolve) => {
             this.dpt = new DPT(this.key, {
                 refreshInterval: this.refreshInterval,
@@ -53,8 +65,14 @@ export class Server {
                 },
             })
 
+            for (const bootnode of BOOTNODES) {
+                this.dpt.bootstrap(bootnode).catch((err) => {
+                  this.logger.error(err);
+                });
+              }
+
             this.dpt.on('error', (error: Error) => {
-                this.logger.error(`DPT Error: ${error}`)
+                this.logger.debug(`DPT Error: ${error}`)
             })
             this.dpt.on('listening', () => {
                 resolve()
@@ -75,19 +93,18 @@ export class Server {
             })
 
             this.rlpx.on('peer:added', (peer: Peer) => {
+                console.log("peer:added")
                 try {
-                    const id = (peer.getId() as Buffer).toString('hex')
-                    this.logger.info(`Peer connedted: ${id}`)
-                    this.handler.handle(peer)
+                    this.handler.handleAdd(peer)
                 } catch (error: any) {
                     this.logger.error(error)
                 }
             })
 
             this.rlpx.on('peer:removed', (peer: Peer, reason: any) => {
+                this.handler.handleRemove(peer, reason)
                 const id = (peer.getId() as Buffer).toString('hex')
                 this.logger.info(`Peer disconnected: ${id}, Reason: ${reason}`)
-
             })
 
             this.rlpx.on('peer:error', (peer: Peer, error: Error) => {

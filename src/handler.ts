@@ -1,32 +1,32 @@
-import { Server } from "./server";
-import { RLPx, DPT, Peer } from "@ethereumjs/devp2p";
-import LRUCache from "lru-cache";
+import { Peer } from "@ethereumjs/devp2p";
 import { Logger } from "tslog";
-import { ETH } from "./eth";
+import { EthHandler } from "./eth";
+import { Consts } from "./interfaces";
 
 const getPeerAddr = (peer: Peer) =>
   `${peer._socket.remoteAddress}:${peer._socket.remotePort}`
+const getPeerId = (peer: Peer) => (peer.getId() as Buffer).toString('hex')
 
 export class Handler {
-    public logger = new Logger
-    public eth: ETH
-    public rlpx: RLPx
-    constructor(eth: ETH, rlpx: RLPx) {
-      this.eth = eth
-      this.rlpx = rlpx
-    }
+  public logger = new Logger({ minLevel: 5 })
+  public eth: EthHandler
+  constructor(eth: EthHandler) {
+    this.eth = eth
+  }
 
-    async handle(peer: Peer) {
-      await this.handshake(peer)
-    }
+  async handleAdd(peer: Peer) {
+    this.logger.debug(`Handle peer added: ${getPeerId(peer)}`)
+    await this.eth.handle(peer)
+  }
 
-    async handshake(peer: Peer) {
-      const addr = getPeerAddr(peer)
-      let j = 0
-      const prot = peer.getProtocols()
-      const eth = peer.getProtocols()[0]
-      // TODO: sendstatus
-    }
-    
+
+  async handleRemove(peer: Peer, reason: any) {
+    this.logger.debug(`Handle peer removed: ${getPeerId(peer)}, Reason: ${reason}`)
+  }
+
+  setConsts(consts: Consts) {
+    this.eth.setConsts(consts)
+  }
+
 }
 

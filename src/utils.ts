@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { Config, Consts, ServerOptions } from "./interfaces";
 import {existsSync, readFileSync} from "fs"
 import { Chain, Common, Hardfork } from "@ethereumjs/common";
+import { int2buffer } from "@ethereumjs/devp2p";
 function getConsts(config: Config): Consts {
     let consts: Consts = {
         CHECK_BLOCK_TITLE: "London Fork",
@@ -42,4 +43,30 @@ export function getOptions(path: string): ServerOptions {
         port: config.ListenPort
     }
     return options
+}
+
+export function getStatus(config: Config): any{
+    let status = {
+        td: int2buffer(17179869184), // total difficulty in genesis block
+        bestHash: Buffer.from(
+          "d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
+          "hex",
+        ),
+        genesisHash: Buffer.from(
+          "d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
+          "hex",
+        ),
+    }
+    if ('Td' in config) {
+        status.td = int2buffer(config.Td!)
+    }
+    if ('BestHash' in config) {
+        status.bestHash = Buffer.from(config.BestHash!, "hex")
+    }
+    if ('GenesisHash' in config) {
+        status.genesisHash = Buffer.from(config.GenesisHash!, "hex")
+    }
+
+    return status
+
 }
