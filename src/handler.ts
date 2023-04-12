@@ -8,7 +8,7 @@ const getPeerAddr = (peer: Peer) =>
 const getPeerId = (peer: Peer) => (peer.getId() as Buffer).toString('hex')
 
 export class Handler {
-  public logger = new Logger({ minLevel: 5 })
+  public logger = new Logger({ minLevel: 2 })
   public eth: EthHandler
   constructor(eth: EthHandler) {
     this.eth = eth
@@ -17,6 +17,7 @@ export class Handler {
   async handleAdd(peer: Peer) {
     this.logger.debug(`Handle peer added: ${getPeerId(peer)}`)
     await this.eth.handle(peer)
+    // TODO: LES Protocol
   }
 
 

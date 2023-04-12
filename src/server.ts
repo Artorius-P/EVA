@@ -13,7 +13,7 @@ export class Server {
     public maxPeers: number
     public clientFilter: Array<string>
     public logger = new Logger({
-        minLevel: 5
+        minLevel: 2
     })
     public handler: Handler
     private key: Buffer
@@ -92,10 +92,10 @@ export class Server {
                 common: this.consts.COMMON,
             })
 
-            this.rlpx.on('peer:added', (peer: Peer) => {
+            this.rlpx.on('peer:added', async (peer: Peer) => {
                 console.log("peer:added")
                 try {
-                    this.handler.handleAdd(peer)
+                    await this.handler.handleAdd(peer)
                 } catch (error: any) {
                     this.logger.error(error)
                 }

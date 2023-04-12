@@ -4,6 +4,7 @@ import { Logger } from "tslog";
 import { getStatus } from "../utils";
 import { arrToBufArr, bufferToHex } from "@ethereumjs/util";
 import { TransactionFactory, TypedTransaction } from "@ethereumjs/tx";
+import { Block, BlockHeader } from "@ethereumjs/block";
 import { EthPeer } from "./peer";
 import { Consts } from "../interfaces";
 import ms from "ms";
@@ -30,28 +31,30 @@ export class EthHandler {
       const addr = getPeerAddr(peer)
       const clientId = peer.getHelloMessage()?.clientId
       this.logger.info(`Add peer: ${addr} ${clientId} (eth${eth.getVersion()})`)
-      await this.handshake(eth, peer)
-      await this.onMessage(eth)
+      const ethPeer = new EthPeer(eth, peer)
+      this.peers.set(ethPeer.id, ethPeer)
+      await this.handshake(ethPeer)
+      await this.onMessage(ethPeer)
     }
 
   }
-  handshake(eth: devp2pETH, peer: Peer): Promise<void> {
+  handshake(ethPeer: EthPeer): Promise<void> {
     return new Promise((resolve) => {
       this.logger.debug("Handshake with peer")
       const status = getStatus({
         Network: "Mainnet",
         Fork: "London",
       })
-      eth.sendStatus(status)
-      eth.once("status", (status) => this.status(status, eth, peer))
+      ethPeer.eth.sendStatus(status)
+      ethPeer.eth.once("status", (status) => this.status(status, ethPeer))
       resolve()
     })
   }
 
   // Nodes should send status first
-  status(status: any, eth: devp2pETH, peer: Peer) {
+  status(status: any, ethPeer: EthPeer) {
     this.logger.debug(`besthash: ${status.bestHash.toString('hex')} forkid: ${status.forkId.toString('hex')}`)
-    eth.sendMessage(devp2pETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [
+    ethPeer.eth.sendMessage(devp2pETH.MESSAGE_CODES.GET_BLOCK_HEADERS, [
       Buffer.from([1]),
       [
         int2buffer(this.consts.CHECK_BLOCK_NR),
@@ -60,16 +63,16 @@ export class EthHandler {
         Buffer.from([]),
       ],
     ]);
-    setTimeout(() => {
-      peer.disconnect(DISCONNECT_REASONS.USELESS_PEER)
+    ethPeer.Timer = setTimeout(() => {
+      ethPeer.disconnect(DISCONNECT_REASONS.USELESS_PEER)
     }, ms("15s"))
   }
 
-  onMessage(eth: ETH): Promise<void> {
+  onMessage(ethPeer: EthPeer): Promise<void> {
     return new Promise((resolve, reject) => {
-      eth.on("message", async (code: devp2pETH.MESSAGE_CODES, payload: any) => {
+      ethPeer.eth.on("message", async (code: devp2pETH.MESSAGE_CODES, payload: any) => {
         try {
-          this.message(code, payload)
+          this.message(ethPeer, code, payload)
           resolve()
         } catch (error) {
           reject(error)
@@ -78,23 +81,23 @@ export class EthHandler {
     })
   }
 
-  message(code: devp2pETH.MESSAGE_CODES, payload: any) {
+  message(ethPeer: EthPeer, code: devp2pETH.MESSAGE_CODES, payload: any) {
     const MSG = devp2pETH.MESSAGE_CODES
     switch (code) {
       case MSG.NEW_BLOCK_HASHES:
         this.newBlockHash()
         break
       case MSG.TX:
-        this.newTx(payload)
+        this.newTx(ethPeer, payload)
         break
       case MSG.NEW_POOLED_TRANSACTION_HASHES:
-        this.newTxHash(payload)
+        this.newTxHash(ethPeer, payload)
         break
       case MSG.GET_BLOCK_HEADERS:
         this.getBlockHeaders()
         break
       case MSG.BLOCK_HEADERS:
-        this.blockHeaders()
+        this.blockHeaders(ethPeer, payload)
         break
       case MSG.GET_BLOCK_BODIES:
         this.getBlockBodies()
@@ -118,7 +121,8 @@ export class EthHandler {
     }
 
   }
-  newTxHash(payload: any) {
+  newTxHash(ethPeer: EthPeer, payload: any) {
+    if (!ethPeer.isVerified) return
     try {
       for (const item of payload) {
         const txHash = bufferToHex(item)
@@ -136,7 +140,8 @@ export class EthHandler {
     }
   }
 
-  newTx(payload: any) {
+  newTx(ethPeer: EthPeer, payload: any) {
+    if (!ethPeer.isVerified) return
     try {
       for (const item of payload) {
         const tx = TransactionFactory.fromBlockBodyData(item)
@@ -164,8 +169,28 @@ export class EthHandler {
 
   }
 
-  blockHeaders() {
-
+  blockHeaders(ethPeer: EthPeer, payload: any) {
+    if (!ethPeer.isVerified) {
+      if (payload[1].length !== 1) {
+        this.logger.error(`${ethPeer.id}expected one header for ${this.consts.CHECK_BLOCK_TITLE} verify (received: ${payload[1].length}`)
+        ethPeer.disconnect(DISCONNECT_REASONS.USELESS_PEER)
+        return
+      }
+      const expectedHash = this.consts.CHECK_BLOCK
+      const common = this.consts.COMMON
+      try {
+        const header = BlockHeader.fromValuesArray(payload[1][0], { common });
+        if (header.hash().toString("hex") === expectedHash) {
+          console.log(
+            `${ethPeer.id} verified to be on the same side of the ${this.consts.CHECK_BLOCK_TITLE}`,
+          );
+          clearTimeout(ethPeer.Timer);
+          ethPeer.isVerified = true;
+        }
+      } catch (e) {
+        this.logger.error(e)
+      }
+    }
   }
 
   getBlockBodies() {
