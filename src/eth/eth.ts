@@ -20,6 +20,7 @@ export class EthHandler {
   private consts: Consts
 
   async handle(peer: Peer) {
+    // When new peer added, check eth protocol
     let eth: devp2pETH | null = null
     const protocols = peer.getProtocols()
     for (const prot of protocols) {
@@ -46,8 +47,11 @@ export class EthHandler {
         Fork: "London",
       })
       ethPeer.eth.sendStatus(status)
-      ethPeer.eth.once("status", (status) => this.status(status, ethPeer))
-      resolve()
+      ethPeer.eth.once("status", (status) => {
+        this.status(status, ethPeer)
+        resolve()
+      })
+
     })
   }
 
@@ -69,11 +73,10 @@ export class EthHandler {
   }
 
   onMessage(ethPeer: EthPeer): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((reject) => {
       ethPeer.eth.on("message", async (code: devp2pETH.MESSAGE_CODES, payload: any) => {
         try {
           this.message(ethPeer, code, payload)
-          resolve()
         } catch (error) {
           reject(error)
         }
