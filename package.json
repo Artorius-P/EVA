@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@ethereumjs/block": "^4.2.1",
     "@ethereumjs/devp2p": "^5.1.1",
     "@ethereumjs/tx": "^4.1.1",
     "ms": "^2.1.3",
